@@ -25,13 +25,20 @@ const MediaControls = ({
   const { toast } = useToast();
   
   useEffect(() => {
-    // Connect to your Flask backend server on port 5000
+    // Connect to your Flask backend server with improved configuration
     const socketConnection = io("http://localhost:5000", {
-      transports: ["websocket", "polling"],
+      transports: ['polling', 'websocket'], // Try polling first, then websocket
+      upgrade: true,
+      forceNew: true,
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      timeout: 20000
     });
     
     socketConnection.on("connect", () => {
       setIsConnected(true);
+      console.log("Connected to server from MediaControls");
       toast({
         title: "Connected to AI Studio",
         description: "Successfully connected to the AI Studio backend",
@@ -39,7 +46,7 @@ const MediaControls = ({
     });
     
     socketConnection.on("connect_error", (error) => {
-      console.error("Connection error:", error);
+      console.error("Connection error from MediaControls:", error);
       setIsConnected(false);
       toast({
         title: "Connection error",
@@ -50,6 +57,7 @@ const MediaControls = ({
     
     socketConnection.on("disconnect", () => {
       setIsConnected(false);
+      console.log("Disconnected from server in MediaControls");
       toast({
         title: "Disconnected",
         description: "Lost connection to the AI Studio backend",
