@@ -3,7 +3,7 @@ numpy==1.26.2
 Pillow==10.1.0
 python-dotenv==1.0.0
 google-cloud-storage==2.13.0
-vertexai==0.0.1
+vertexai
 mss==9.0.1
 SpeechRecognition==3.10.0
 google-cloud-aiplatform==1.36.4
