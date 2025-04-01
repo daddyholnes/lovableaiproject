@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Camera, CameraOff, Mic, MicOff, Upload, Video, ScreenShare, Folder, Youtube, Google } from "lucide-react";
+import { Camera, CameraOff, Mic, MicOff, Upload, Video, ScreenShare, Folder, Youtube, FileIcon } from "lucide-react";
 
 interface MediaControlsProps {
   isCameraEnabled: boolean;
@@ -97,7 +97,7 @@ const MediaControls = ({
               variant="outline"
               className="flex flex-col items-center h-16 py-2"
             >
-              <Google className="h-5 w-5 mb-1" />
+              <FileIcon className="h-5 w-5 mb-1" />
               <span className="text-xs">Drive</span>
             </Button>
             
