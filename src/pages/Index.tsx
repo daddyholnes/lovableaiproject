@@ -5,30 +5,86 @@ import ChatArea from "@/components/ChatArea";
 import SettingsSidebar from "@/components/SettingsSidebar";
 import MediaControls from "@/components/MediaControls";
 import Header from "@/components/Header";
+import { useToast } from "@/hooks/use-toast";
+import { io } from "socket.io-client";
 
 const Index = () => {
   const [messages, setMessages] = useState<Array<{role: string; content: string; image?: string}>>([]);
   const [isCameraEnabled, setIsCameraEnabled] = useState<boolean>(true);
   const [isMicEnabled, setIsMicEnabled] = useState<boolean>(true);
-  const [selectedModel, setSelectedModel] = useState<string>("gemini-1.0-pro");
+  const [selectedModel, setSelectedModel] = useState<string>("");
   const [isPersonalMode, setIsPersonalMode] = useState<boolean>(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const { toast } = useToast();
+  const [socket, setSocket] = useState<any>(null);
+
+  useEffect(() => {
+    // Create a socket connection to handle messages
+    const socketConnection = io("http://localhost:5000", {
+      transports: ['polling', 'websocket'], // Try polling first, then websocket
+      upgrade: true,
+      forceNew: true,
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      timeout: 20000
+    });
+
+    socketConnection.on("connect", () => {
+      console.log("Connected to server from Index");
+    });
+
+    socketConnection.on("stream_response_chunk", (data) => {
+      // Add AI response in chunks
+      const lastMessage = messages[messages.length - 1];
+      
+      if (lastMessage && lastMessage.role === "ai") {
+        // Update the last message
+        setMessages(prevMessages => {
+          const updatedMessages = [...prevMessages];
+          updatedMessages[updatedMessages.length - 1] = {
+            ...updatedMessages[updatedMessages.length - 1],
+            content: updatedMessages[updatedMessages.length - 1].content + data.text
+          };
+          return updatedMessages;
+        });
+      } else {
+        // Create a new AI message
+        setMessages(prevMessages => [
+          ...prevMessages,
+          { role: "ai", content: data.text }
+        ]);
+      }
+    });
+
+    setSocket(socketConnection);
+
+    return () => {
+      socketConnection.disconnect();
+    };
+  }, []);
 
   const handleSendMessage = (message: string, image?: string) => {
     // Add user message
-    setMessages([...messages, { role: "user", content: message, image }]);
+    const updatedMessages = [...messages, { role: "user", content: message, image }];
+    setMessages(updatedMessages);
     
-    // Mock AI response (in a real app, this would be an API call)
-    setTimeout(() => {
-      setMessages(prev => [
-        ...prev,
-        { 
-          role: "ai", 
-          content: `This is a response from ${selectedModel}. In a real implementation, this would connect to your Flask backend.` 
-        }
-      ]);
-    }, 1000);
+    // Send the message to the backend via socket
+    if (socket && socket.connected) {
+      socket.emit('send_message', {
+        text: message,
+        model: selectedModel || 'gemini-1.0-pro', // Default if none selected
+        image_base64: image,
+        history: [] // You may want to format chat history here
+      });
+    } else {
+      toast({
+        title: "Connection error",
+        description: "Not connected to server. Please ensure your Flask backend is running.",
+        variant: "destructive",
+      });
+    }
   };
 
   const toggleCamera = () => {
@@ -57,6 +113,11 @@ const Index = () => {
       }
     } catch (error) {
       console.error("Error accessing webcam:", error);
+      toast({
+        title: "Camera error",
+        description: "Could not access your camera. Please check permissions.",
+        variant: "destructive",
+      });
     }
   };
 
