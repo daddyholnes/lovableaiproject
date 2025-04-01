@@ -1,8 +1,10 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Camera, CameraOff, Mic, MicOff, Upload, Video, ScreenShare, Folder, Youtube, FileIcon } from "lucide-react";
+import { Camera, CameraOff, Mic, MicOff, Upload, ScreenShare, Folder, Youtube, FileIcon } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { io } from "socket.io-client";
 
 interface MediaControlsProps {
   isCameraEnabled: boolean;
@@ -18,20 +20,104 @@ const MediaControls = ({
   toggleMic 
 }: MediaControlsProps) => {
   const [showPopover, setShowPopover] = useState(false);
+  const [socket, setSocket] = useState<any>(null);
+  const { toast } = useToast();
+  
+  useEffect(() => {
+    // Connect to your backend server
+    // Change this URL to match your backend server address
+    const socketConnection = io("http://localhost:5000");
+    
+    socketConnection.on("connect", () => {
+      toast({
+        title: "Connected to server",
+        description: "Successfully connected to the AI Studio backend",
+      });
+    });
+    
+    socketConnection.on("connect_error", (error) => {
+      console.error("Connection error:", error);
+      toast({
+        title: "Connection error",
+        description: "Could not connect to the AI Studio backend",
+        variant: "destructive",
+      });
+    });
+    
+    setSocket(socketConnection);
+    
+    return () => {
+      socketConnection.disconnect();
+    };
+  }, [toast]);
   
   const handleFileUpload = () => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*,video/*';
     input.onchange = (e) => {
-      // Handle file upload
       const target = e.target as HTMLInputElement;
       if (target.files && target.files[0]) {
-        console.log("File selected:", target.files[0]);
-        // Here you would typically process the file, e.g., display it or send it
+        const file = target.files[0];
+        console.log("File selected:", file);
+        
+        if (socket && socket.connected) {
+          // Convert file to base64
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const base64data = reader.result as string;
+            // Send to backend
+            socket.emit('send_message', {
+              text: 'Sent Image',
+              model: 'gemini-1.0-pro-vision',  // Adjust model as needed
+              image_base64: base64data,
+              history: []  // You may want to add chat history here
+            });
+            
+            toast({
+              title: "File uploaded",
+              description: `${file.name} has been sent to the AI`,
+            });
+          };
+          reader.readAsDataURL(file);
+        } else {
+          toast({
+            title: "Connection error",
+            description: "Not connected to server. Please check your backend connection.",
+            variant: "destructive",
+          });
+        }
       }
     };
     input.click();
+  };
+
+  const handleScreenShare = () => {
+    toast({
+      title: "Screen sharing",
+      description: "Screen sharing feature coming soon",
+    });
+  };
+
+  const handleDriveUpload = () => {
+    toast({
+      title: "Google Drive",
+      description: "Google Drive integration coming soon",
+    });
+  };
+
+  const handleYoutubeUpload = () => {
+    toast({
+      title: "YouTube",
+      description: "YouTube integration coming soon",
+    });
+  };
+
+  const handleFilesUpload = () => {
+    toast({
+      title: "Files",
+      description: "Files feature coming soon",
+    });
   };
 
   return (
@@ -88,6 +174,7 @@ const MediaControls = ({
             <Button
               variant="outline"
               className="flex flex-col items-center h-16 py-2"
+              onClick={handleScreenShare}
             >
               <ScreenShare className="h-5 w-5 mb-1" />
               <span className="text-xs">Screen</span>
@@ -96,6 +183,7 @@ const MediaControls = ({
             <Button
               variant="outline"
               className="flex flex-col items-center h-16 py-2"
+              onClick={handleDriveUpload}
             >
               <FileIcon className="h-5 w-5 mb-1" />
               <span className="text-xs">Drive</span>
@@ -104,6 +192,7 @@ const MediaControls = ({
             <Button
               variant="outline"
               className="flex flex-col items-center h-16 py-2"
+              onClick={handleYoutubeUpload}
             >
               <Youtube className="h-5 w-5 mb-1" />
               <span className="text-xs">YouTube</span>
@@ -112,6 +201,7 @@ const MediaControls = ({
             <Button
               variant="outline"
               className="flex flex-col items-center h-16 py-2"
+              onClick={handleFilesUpload}
             >
               <Folder className="h-5 w-5 mb-1" />
               <span className="text-xs">Files</span>
