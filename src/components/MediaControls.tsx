@@ -21,35 +21,87 @@ const MediaControls = ({
 }: MediaControlsProps) => {
   const [showPopover, setShowPopover] = useState(false);
   const [socket, setSocket] = useState<any>(null);
+  const [isConnected, setIsConnected] = useState(false);
   const { toast } = useToast();
   
   useEffect(() => {
-    // Connect to your backend server
-    // Change this URL to match your backend server address
-    const socketConnection = io("http://localhost:5000");
+    // Connect to your Flask backend server on port 5000
+    const socketConnection = io("http://localhost:5000", {
+      transports: ["websocket", "polling"],
+    });
     
     socketConnection.on("connect", () => {
+      setIsConnected(true);
       toast({
-        title: "Connected to server",
+        title: "Connected to AI Studio",
         description: "Successfully connected to the AI Studio backend",
       });
     });
     
     socketConnection.on("connect_error", (error) => {
       console.error("Connection error:", error);
+      setIsConnected(false);
       toast({
         title: "Connection error",
-        description: "Could not connect to the AI Studio backend",
+        description: "Could not connect to the AI Studio backend. Is your Flask server running?",
+        variant: "destructive",
+      });
+    });
+    
+    socketConnection.on("disconnect", () => {
+      setIsConnected(false);
+      toast({
+        title: "Disconnected",
+        description: "Lost connection to the AI Studio backend",
+        variant: "destructive",
+      });
+    });
+    
+    // Listen for model list from server
+    socketConnection.on("available_models", (models) => {
+      console.log("Available models:", models);
+      // You could store these in state if needed
+    });
+    
+    // Listen for response chunks
+    socketConnection.on("stream_response_chunk", (data) => {
+      console.log("Response chunk:", data.text);
+      // Handle streaming response chunks in the UI
+    });
+    
+    // Listen for end of response
+    socketConnection.on("stream_response_end", () => {
+      console.log("Response streaming completed");
+      // Handle completion of response
+    });
+    
+    // Listen for error messages
+    socketConnection.on("error", (data) => {
+      console.error("Server error:", data.message);
+      toast({
+        title: "Server error",
+        description: data.message,
         variant: "destructive",
       });
     });
     
     setSocket(socketConnection);
     
+    // Request available models from the server
+    socketConnection.emit("request_models");
+    
+    // Cleanup on unmount
     return () => {
       socketConnection.disconnect();
     };
   }, [toast]);
+  
+  // Emit camera toggle event to backend when camera state changes
+  useEffect(() => {
+    if (socket && socket.connected) {
+      socket.emit('toggle_camera', { enabled: isCameraEnabled });
+    }
+  }, [isCameraEnabled, socket]);
   
   const handleFileUpload = () => {
     const input = document.createElement('input');
@@ -69,7 +121,7 @@ const MediaControls = ({
             // Send to backend
             socket.emit('send_message', {
               text: 'Sent Image',
-              model: 'gemini-1.0-pro-vision',  // Adjust model as needed
+              model: 'gemini-1.0-pro-vision',  // You should let users select the model
               image_base64: base64data,
               history: []  // You may want to add chat history here
             });
@@ -95,28 +147,28 @@ const MediaControls = ({
   const handleScreenShare = () => {
     toast({
       title: "Screen sharing",
-      description: "Screen sharing feature coming soon",
+      description: "Screen sharing functionality is coming soon",
     });
   };
 
   const handleDriveUpload = () => {
     toast({
       title: "Google Drive",
-      description: "Google Drive integration coming soon",
+      description: "Google Drive integration is coming soon",
     });
   };
 
   const handleYoutubeUpload = () => {
     toast({
       title: "YouTube",
-      description: "YouTube integration coming soon",
+      description: "YouTube integration is coming soon",
     });
   };
 
   const handleFilesUpload = () => {
     toast({
       title: "Files",
-      description: "Files feature coming soon",
+      description: "Files feature is coming soon",
     });
   };
 
@@ -125,7 +177,7 @@ const MediaControls = ({
       <Popover open={showPopover} onOpenChange={setShowPopover}>
         <PopoverTrigger asChild>
           <Button 
-            className="h-12 w-12 rounded-full bg-primary shadow-lg mb-3"
+            className={`h-12 w-12 rounded-full shadow-lg mb-3 ${isConnected ? 'bg-primary' : 'bg-gray-400'}`}
             onClick={() => setShowPopover(!showPopover)}
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -142,6 +194,7 @@ const MediaControls = ({
               variant="outline"
               className="flex flex-col items-center h-16 py-2"
               onClick={handleFileUpload}
+              disabled={!isConnected}
             >
               <Upload className="h-5 w-5 mb-1" />
               <span className="text-xs">Upload</span>
@@ -175,6 +228,7 @@ const MediaControls = ({
               variant="outline"
               className="flex flex-col items-center h-16 py-2"
               onClick={handleScreenShare}
+              disabled={!isConnected}
             >
               <ScreenShare className="h-5 w-5 mb-1" />
               <span className="text-xs">Screen</span>
@@ -184,6 +238,7 @@ const MediaControls = ({
               variant="outline"
               className="flex flex-col items-center h-16 py-2"
               onClick={handleDriveUpload}
+              disabled={!isConnected}
             >
               <FileIcon className="h-5 w-5 mb-1" />
               <span className="text-xs">Drive</span>
@@ -193,6 +248,7 @@ const MediaControls = ({
               variant="outline"
               className="flex flex-col items-center h-16 py-2"
               onClick={handleYoutubeUpload}
+              disabled={!isConnected}
             >
               <Youtube className="h-5 w-5 mb-1" />
               <span className="text-xs">YouTube</span>
@@ -202,13 +258,19 @@ const MediaControls = ({
               variant="outline"
               className="flex flex-col items-center h-16 py-2"
               onClick={handleFilesUpload}
+              disabled={!isConnected}
             >
               <Folder className="h-5 w-5 mb-1" />
               <span className="text-xs">Files</span>
             </Button>
           </div>
           
-          <p className="text-xs text-muted-foreground mt-2">Add files, images, or media to enhance your conversation</p>
+          <div className="flex items-center mt-2">
+            <div className={`w-2 h-2 rounded-full mr-2 ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+            <p className="text-xs text-muted-foreground">
+              {isConnected ? 'Connected to AI Studio backend' : 'Not connected to backend'}
+            </p>
+          </div>
         </PopoverContent>
       </Popover>
       
