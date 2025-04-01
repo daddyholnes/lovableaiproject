@@ -10,25 +10,18 @@ const Index = () => {
   const [messages, setMessages] = useState<Array<{role: string; content: string; image?: string}>>([]);
   const [isCameraEnabled, setIsCameraEnabled] = useState<boolean>(true);
   const [isMicEnabled, setIsMicEnabled] = useState<boolean>(true);
-  const [selectedModel, setSelectedModel] = useState<string>("gemini-1.0-pro");
+  const [selectedModel, setSelectedModel] = useState<string>("");
   const [isPersonalMode, setIsPersonalMode] = useState<boolean>(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
 
   const handleSendMessage = (message: string, image?: string) => {
     // Add user message
-    setMessages([...messages, { role: "user", content: message, image }]);
+    const updatedMessages = [...messages, { role: "user", content: message, image }];
+    setMessages(updatedMessages);
     
-    // Mock AI response (in a real app, this would be an API call)
-    setTimeout(() => {
-      setMessages(prev => [
-        ...prev,
-        { 
-          role: "ai", 
-          content: `This is a response from ${selectedModel}. In a real implementation, this would connect to your Flask backend.` 
-        }
-      ]);
-    }, 1000);
+    // In a real implementation, this would connect to your Flask backend
+    // The actual response will now come from the socket connection in MediaControls.tsx
   };
 
   const toggleCamera = () => {

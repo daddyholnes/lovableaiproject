@@ -3,6 +3,8 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Send } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { io } from "socket.io-client";
 
 interface ChatAreaProps {
   messages: Array<{role: string; content: string; image?: string}>;
@@ -13,7 +15,35 @@ interface ChatAreaProps {
 
 const ChatArea = ({ messages, onSendMessage, selectedModel, setSelectedModel }: ChatAreaProps) => {
   const [inputMessage, setInputMessage] = useState("");
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    // Connect to your Flask backend
+    const socket = io("http://localhost:5000", {
+      transports: ["websocket", "polling"],
+    });
+    
+    // Listen for available models from server
+    socket.on("available_models", (models) => {
+      console.log("Available models:", models);
+      setAvailableModels(models);
+      
+      // Set default model if none selected yet
+      if (!selectedModel && models.length > 0) {
+        setSelectedModel(models[0]);
+      }
+    });
+    
+    // Request available models from the server
+    socket.emit("request_models");
+    
+    // Clean up on unmount
+    return () => {
+      socket.disconnect();
+    };
+  }, [selectedModel, setSelectedModel]);
 
   const handleSendMessage = () => {
     if (inputMessage.trim()) {
@@ -85,11 +115,16 @@ const ChatArea = ({ messages, onSendMessage, selectedModel, setSelectedModel }: 
             <SelectTrigger className="w-[180px] border-0 focus:ring-0">
               <SelectValue placeholder="Select Model" />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="gemini-1.0-pro">gemini-1.0-pro</SelectItem>
-              <SelectItem value="gemini-1.5-pro">gemini-1.5-pro</SelectItem>
-              <SelectItem value="gemini-1.5-flash">gemini-1.5-flash</SelectItem>
-              <SelectItem value="gemini-2.0-pro">gemini-2.0-pro</SelectItem>
+            <SelectContent className="max-h-80 overflow-y-auto">
+              {availableModels.length > 0 ? (
+                availableModels.map((model) => (
+                  <SelectItem key={model} value={model}>
+                    {model}
+                  </SelectItem>
+                ))
+              ) : (
+                <SelectItem value="gemini-1.0-pro">gemini-1.0-pro</SelectItem>
+              )}
             </SelectContent>
           </Select>
           <Button 
